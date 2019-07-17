@@ -7,10 +7,14 @@
 #include<opencv2/imgproc.hpp>
 
 
-
-
 using namespace std;
 using namespace cv;
+
+/*
+Mat mystitched(Mat rgbd1, Mat rgbd2) {
+
+}
+*/
 
 
 int main()
@@ -94,10 +98,9 @@ int main()
 	bool fla = false;
 
 	Mat imgright, imgleft;
-	if ((propimg1 / (goodmatches.size() + 0.0)) > (propimg2 / (goodmatches.size() + 0.0))) {
+	if ((propimg1 / (res.size() + 0.0)) > (propimg2 / (res.size() + 0.0))) {
 		imgleft = rgbd1.clone();
 		fla = true;
-
 	}
 	else {
 		imgleft = rgbd2.clone();
@@ -112,12 +115,12 @@ int main()
 	}
 
 	
-	warpPerspective(rgbd2, stitchedimg, homo, Size(rgbd2.cols + rgbd1.cols, mrows));
+	warpPerspective(imgright, stitchedimg, homo, Size(rgbd2.cols + rgbd1.cols, mrows));
 
 	
 	Mat half(stitchedimg, Rect(0, 0, imgleft.cols, imgleft.rows));
 	imgleft.copyTo(half);
-	imshow("test", stitchedimg);
+	imshow("test", imgright);
 	
 	
 
