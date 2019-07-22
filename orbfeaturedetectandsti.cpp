@@ -1,3 +1,4 @@
+
 #include<iostream>
 #include<vector>
 #include<opencv2/core/core.hpp>
@@ -10,6 +11,62 @@
 using namespace std;
 using namespace cv;
 
+typedef struct
+{
+	Point2f left_top;
+	Point2f left_bottom;
+	Point2f right_top;
+	Point2f right_bottom;
+}four_corners_t;
+
+
+
+
+void CalcCorners(const Mat& H, const Mat& src, four_corners_t& corners)
+{
+	double v2[] = { 0, 0, 1 };//左上角
+	double v1[3];//变换后的坐标值
+	Mat V2 = Mat(3, 1, CV_64FC1, v2);  //列向量
+	Mat V1 = Mat(3, 1, CV_64FC1, v1);  //列向量
+
+	V1 = H * V2;
+	//左上角(0,0,1)
+	cout << "V2: " << V2 << endl;
+	cout << "V1: " << V1 << endl;
+	corners.left_top.x = v1[0] / v1[2];
+	corners.left_top.y = v1[1] / v1[2];
+
+	//左下角(0,src.rows,1)
+	v2[0] = 0;
+	v2[1] = src.rows;
+	v2[2] = 1;
+	V2 = Mat(3, 1, CV_64FC1, v2);  //列向量
+	V1 = Mat(3, 1, CV_64FC1, v1);  //列向量
+	V1 = H * V2;
+	corners.left_bottom.x = v1[0] / v1[2];
+	corners.left_bottom.y = v1[1] / v1[2];
+
+	//右上角(src.cols,0,1)
+	v2[0] = src.cols;
+	v2[1] = 0;
+	v2[2] = 1;
+	V2 = Mat(3, 1, CV_64FC1, v2);  //列向量
+	V1 = Mat(3, 1, CV_64FC1, v1);  //列向量
+	V1 = H * V2;
+	corners.right_top.x = v1[0] / v1[2];
+	corners.right_top.y = v1[1] / v1[2];
+
+	//右下角(src.cols,src.rows,1)
+	v2[0] = src.cols;
+	v2[1] = src.rows;
+	v2[2] = 1;
+	V2 = Mat(3, 1, CV_64FC1, v2);  //列向量
+	V1 = Mat(3, 1, CV_64FC1, v1);  //列向量
+	V1 = H * V2;
+	corners.right_bottom.x = v1[0] / v1[2];
+	corners.right_bottom.y = v1[1] / v1[2];
+
+}
 /*
 Mat mystitched(Mat rgbd1, Mat rgbd2) {
 
@@ -78,13 +135,12 @@ int main()
 		imgpoints1.push_back(Keypoints1[res[i].queryIdx].pt);
 		imgpoints2.push_back(Keypoints2[res[i].trainIdx].pt);
 	}
-	Mat homo = findHomography(imgpoints1, imgpoints2, CV_RANSAC);
+	Mat homo = findHomography(imgpoints2, imgpoints1, CV_RANSAC);
 	cout << homo << endl << endl;
 
-	Mat stitchedimg;
-	int mrows = rgbd1.rows > rgbd2.rows ? rgbd1.rows : rgbd2.rows;
-
 	
+	int mrows = rgbd1.rows > rgbd2.rows ? rgbd1.rows : rgbd2.rows;
+	/*
 	int propimg1 = 0, propimg2 = 0;
 	for (int i = 0; i < res.size(); i++) {
 		if (Keypoints1[res[i].queryIdx].pt.x > rgbd1.cols / 2) {
@@ -94,9 +150,8 @@ int main()
 			propimg2++;
 		}
 	}
-
 	bool fla = false;
-
+	
 	Mat imgright, imgleft;
 	if ((propimg1 / (res.size() + 0.0)) > (propimg2 / (res.size() + 0.0))) {
 		imgleft = rgbd1.clone();
@@ -113,14 +168,34 @@ int main()
 	else {
 		imgright = rgbd1.clone();
 	}
+	*/
+	Mat stitchedimg;
+	Mat color1 = rgbd1(Rect(100, 0, 5, rgbd1.rows));
+	Mat color2 = rgbd2(Rect(100, 0, 5, rgbd2.rows));
+	Mat mid;
+	four_corners_t cor, cor1;
+	CalcCorners(homo, color2, cor1);
+	CalcCorners(homo, rgbd2, cor);
+	warpPerspective(color2, mid, homo, Size(MAX(cor.right_top.x, cor.right_bottom.x), mrows));
+	warpPerspective(rgbd2, stitchedimg, homo, Size(MAX(cor.right_top.x, cor.right_bottom.x), mrows));
+	Mat lin(mid.rows, mid.cols, CV_8UC3);
+	lin.setTo(0);
+	mid.copyTo(lin(Rect(0, 0, mid.cols, mid.rows)));
+	color1.copyTo(lin(Rect(0, 0, color1.cols, color1.rows)));
 
-	
-	warpPerspective(imgright, stitchedimg, homo, Size(rgbd2.cols + rgbd1.cols, mrows));
-
-	
-	Mat half(stitchedimg, Rect(0, 0, imgleft.cols, imgleft.rows));
-	imgleft.copyTo(half);
-	imshow("test", imgright);
+	int dst_width = stitchedimg.cols;
+	int dst_height = stitchedimg.rows;
+	Mat dst(dst_height, dst_width, CV_8UC3);
+	dst.setTo(0);
+	//Mat tmp = rgbd2(Rect(100, 0, 5, stitchedimg.rows));
+	stitchedimg.copyTo(dst(Rect(0, 0, stitchedimg.cols, stitchedimg.rows)));
+	rgbd1.copyTo(dst(Rect(0, 0, rgbd1.cols, rgbd1.rows)));
+	//Mat half(stitchedimg, Rect(0, 0, rgbd1.cols, rgbd1.rows));
+	//100-105
+	//rgbd1.copyTo(stitchedimg(Rect(0, 0, rgbd1.cols, rgbd1.rows)));
+	imshow("mid", lin);
+	imshow("test", dst);
+	//imwrite("res.tif", dst);
 	
 	
 
